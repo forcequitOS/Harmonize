@@ -58,7 +58,7 @@ public class Playcuts: ObservableObject {
                     }
                 }
             } else {
-                print("Invalid pairing code.")
+                print("Invalid Playcuts pairing code.")
                 return HttpResponse.badRequest(.text("Your pairing code is incorrect."))
             }
             
@@ -67,14 +67,14 @@ public class Playcuts: ObservableObject {
         
         do {
             try server.start(port, forceIPv4: true)
-            print("Server initialized successfully on port \(port)!")
+            print("Playcuts initialized successfully on port \(port)!")
             self.server = server
             DispatchQueue.main.async {
                 self.isRunning = true
                 self.displayPairingCode()
             }
         } catch {
-            print("Server initialization error: \(error)")
+            print("Playcuts initialization error: \(error)")
         }
     }
     
