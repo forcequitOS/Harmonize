@@ -2,12 +2,16 @@ import SwiftUI
 import Swifter
 
 public class Playcuts: ObservableObject {
-    @AppStorage("pairingCode") private var pairingCode: Int = 0
+    @AppStorage("pairingCode") private var storedPairingCode: Int = 0
     @Published public var isRunning = false
     @Published public var receivedDisplayData: String = ""
     @Published public var isPairingCodeVisible = false
     
     private var server: HttpServer?
+    private var pairingCode: Int {
+        get { storedPairingCode }
+        set { storedPairingCode = newValue }
+    }
     
     public init() {
         // Generate a new pairing code if it hasn't been generated yet
