@@ -9,17 +9,19 @@ let package = Package(
     products: [
         .library(
             name: "Playcuts",
-            targets: ["Playcuts"]
-        )
+            targets: ["Playcuts"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/httpswift/swifter.git", from: "1.5.0")
+        .package(url: "https://github.com/httpswift/swifter.git", from: "1.5.0"),
     ],
     targets: [
         .target(
             name: "Playcuts",
-            dependencies: ["Swifter"],
+            dependencies: [
+                .product(name: "Swifter", package: "swifter")
+            ],
             path: "Sources"
-        )
-    ]
+        ),
+    ],
+    swiftLanguageVersions: [.v5]
 )
