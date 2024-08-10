@@ -8,7 +8,7 @@ public class Playcuts: ObservableObject {
     @Published public var isPairingCodeVisible = false
     
     private var server: HttpServer?
-    private var pairingCode: Int {
+    public var pairingCode: Int {
         get { storedPairingCode }
         set { storedPairingCode = newValue }
     }
