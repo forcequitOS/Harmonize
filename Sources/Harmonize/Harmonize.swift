@@ -1,7 +1,7 @@
 import SwiftUI
 import Swifter
 
-public class Playcuts: ObservableObject {
+public class Harmonize: ObservableObject {
     @AppStorage("pairingCode") private var storedPairingCode: Int = 0
     @Published public var isRunning = false
     @Published public var receivedDisplayData: String = ""
@@ -13,6 +13,9 @@ public class Playcuts: ObservableObject {
         set { storedPairingCode = newValue }
     }
     
+    // Define a closure that the host app can provide to specify valid inputs and how to handle them
+    public var validInputsHandler: (([String: Any]) -> (response: [String: Any], output: String?))?
+    
     public init() {
         // Generate a new pairing code if it hasn't been generated yet
         if pairingCode == 0 {
@@ -20,12 +23,12 @@ public class Playcuts: ObservableObject {
         }
     }
     
-    public func start() {
+    // Start the server with an optional port
+    public func start(port: UInt16 = 6996) {
         guard server == nil else { return } // Server already running
         
         let server = HttpServer()
         server.listenAddressIPv4 = "127.0.0.1"
-        let port: UInt16 = 6996
         
         server["/"] = { request in
             guard let jsonData = Data(request.body) as? Data,
@@ -38,43 +41,44 @@ public class Playcuts: ObservableObject {
                 return HttpResponse.badRequest(.text("Your request is missing a pairing code."))
             }
             
-            let verification = json["verification"] as? Bool
-            let display = json["display"] as? String
-            
+            // Handle verification
             if authCode == self.pairingCode {
+                let verification = json["verification"] as? Bool
                 if verification == true {
                     print("Successfully authenticated!")
-                    return HttpResponse.ok(.text("Success"))
-                } else if verification == nil {
-                    if let displayData = display {
-                        print("Received: \(json)")
-                        DispatchQueue.main.async {
-                            self.receivedDisplayData = displayData
-                        }
-                        return HttpResponse.ok(.text("Request received successfully!"))
-                    } else {
-                        print("Received: \(json)")
-                        return HttpResponse.badRequest(.text("Request received but no 'display' key found."))
+                    DispatchQueue.main.async {
+                        self.dismissPairingCode()
                     }
+                    return HttpResponse.ok(.text("Success"))
+                }
+                
+                // Process valid inputs (ignoring pairing code and verification)
+                if let validInputsHandler = self.validInputsHandler {
+                    let (response, output) = validInputsHandler(json)
+                    
+                    // If the host app did not specify an output, send a default response
+                    let responseText = output ?? "Message received!"
+                    return HttpResponse.ok(.text(responseText))
+                } else {
+                    return HttpResponse.badRequest(.text("No valid input handler provided by host app."))
                 }
             } else {
-                print("Invalid Playcuts pairing code.")
+                print("Invalid Harmonize pairing code.")
                 return HttpResponse.badRequest(.text("Your pairing code is incorrect."))
             }
-            
-            return HttpResponse.badRequest(.text("Invalid request!"))
         }
         
+        // Start the server
         do {
             try server.start(port, forceIPv4: true)
-            print("Playcuts initialized successfully on port \(port)!")
+            print("Harmonize initialized successfully on port \(port)!")
             self.server = server
             DispatchQueue.main.async {
                 self.isRunning = true
                 self.displayPairingCode()
             }
         } catch {
-            print("Playcuts initialization error: \(error)")
+            print("Harmonize initialization error: \(error)")
         }
     }
     
@@ -103,58 +107,4 @@ public class Playcuts: ObservableObject {
         pairingCode = Int.random(in: 1...9999)
         displayPairingCode()
     }
-}
-
-public struct PairingCodeOverlay: View {
-    let pairingCode: String
-    let onDismiss: () -> Void
-    
-    public init(pairingCode: String, onDismiss: @escaping () -> Void) {
-        self.pairingCode = pairingCode
-        self.onDismiss = onDismiss
-    }
-    
-    public var body: some View {
-        ZStack {
-            VisualEffectBlur(style: .systemUltraThinMaterial)
-            
-            VStack(spacing: 20) {
-                Text("Pairing Code")
-                    .font(.system(.largeTitle))
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                
-                Text("Shortcuts Setup")
-                    .font(.system(.title2))
-                    .frame(maxWidth: .infinity)
-                
-                HStack(spacing: 15) {
-                    ForEach(pairingCode.map { String($0) }, id: \.self) { digit in
-                        Text(digit)
-                            .font(.system(size: 50, weight: .medium, design: .monospaced))
-                            .frame(width: 60, height: 80)
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(10)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .edgesIgnoringSafeArea(.all)
-        .onTapGesture {
-            onDismiss()
-        }
-        .transition(.opacity)
-    }
-}
-
-public struct VisualEffectBlur: UIViewRepresentable {
-    public var style: UIBlurEffect.Style = .systemMaterial
-    
-    public func makeUIView(context: Context) -> UIVisualEffectView {
-        return UIVisualEffectView(effect: UIBlurEffect(style: style))
-    }
-    
-    public func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
