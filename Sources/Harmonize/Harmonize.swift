@@ -8,13 +8,11 @@ public class Harmonize: ObservableObject {
     @Published public var isPairingCodeVisible = false
     
     private var server: HttpServer?
+    
     public var pairingCode: Int {
         get { storedPairingCode }
         set { storedPairingCode = newValue }
     }
-    
-    // Define a closure that the host app can provide to specify valid inputs and how to handle them
-    public var validInputsHandler: (([String: Any]) -> (response: [String: Any], output: String?))?
     
     public init() {
         // Generate a new pairing code if it hasn't been generated yet
@@ -23,12 +21,12 @@ public class Harmonize: ObservableObject {
         }
     }
     
-    // Start the server with an optional port
-    public func start(port: UInt16 = 6996) {
+    public func start() {
         guard server == nil else { return } // Server already running
         
         let server = HttpServer()
         server.listenAddressIPv4 = "127.0.0.1"
+        let port: UInt16 = 6996  // You can make this configurable
         
         server["/"] = { request in
             guard let jsonData = Data(request.body) as? Data,
@@ -36,46 +34,22 @@ public class Harmonize: ObservableObject {
                 return HttpResponse.badRequest(.text("Invalid JSON"))
             }
             
-            guard let authCode = json["auth"] as? Int else {
-                print("No pairing code detected.")
-                return HttpResponse.badRequest(.text("Your request is missing a pairing code."))
-            }
-            
-            // Handle verification
-            if authCode == self.pairingCode {
-                let verification = json["verification"] as? Bool
-                if verification == true {
-                    print("Successfully authenticated!")
-                    DispatchQueue.main.async {
-                        self.dismissPairingCode()
-                    }
-                    return HttpResponse.ok(.text("Success"))
-                }
-                
-                // Process valid inputs (ignoring pairing code and verification)
-                if let validInputsHandler = self.validInputsHandler {
-                    let (response, output) = validInputsHandler(json)
-                    
-                    // If the host app did not specify an output, send a default response
-                    let responseText = output ?? "Message received!"
-                    return HttpResponse.ok(.text(responseText))
-                } else {
-                    return HttpResponse.badRequest(.text("No valid input handler provided by host app."))
-                }
+            if let authCode = json["auth"] as? Int, authCode == self.pairingCode {
+                // Handle valid requests
+                self.handleValidRequest(json)
+                return HttpResponse.ok(.text("Request processed successfully"))
             } else {
-                print("Invalid Harmonize pairing code.")
-                return HttpResponse.badRequest(.text("Your pairing code is incorrect."))
+                return HttpResponse.badRequest(.text("Invalid pairing code"))
             }
         }
         
-        // Start the server
         do {
             try server.start(port, forceIPv4: true)
             print("Harmonize initialized successfully on port \(port)!")
             self.server = server
             DispatchQueue.main.async {
                 self.isRunning = true
-                self.displayPairingCode()
+                self.displayPairingCode()  // Show the pairing code when the server starts
             }
         } catch {
             print("Harmonize initialization error: \(error)")
@@ -106,5 +80,15 @@ public class Harmonize: ObservableObject {
     public func resetPairingCode() {
         pairingCode = Int.random(in: 1...9999)
         displayPairingCode()
+    }
+    
+    private func handleValidRequest(_ json: [String: Any]) {
+        // Here, you can manage inputs and outputs as needed
+        // For example:
+        if let displayData = json["display"] as? String {
+            DispatchQueue.main.async {
+                self.receivedDisplayData = displayData
+            }
+        }
     }
 }
